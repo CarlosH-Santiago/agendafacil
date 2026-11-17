@@ -3,15 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../../core/routes.dart';
 import '../../core/theme.dart';
+import '../../state/app_state.dart';
 import '../../widgets/primary_cta_button.dart';
 
-/// Estrutura reutilizável para as telas modulares (Telas 4 a 14).
+/// Estrutura reutilizável para as telas modulares do fluxo de atendimento.
 ///
-/// Padroniza `AppBar` com retorno explícito e atalho para a Home, cartão de
-/// rastreabilidade (Tela, Dev responsável e Branch Git), margem lateral de
-/// 16 dp, prevenção de overflow e barra inferior na Zona do Polegar.
+/// Padroniza `AppBar` com retorno explícito, margem lateral de 16 dp, prevenção
+/// de overflow e barra inferior ancorada na Zona do Polegar. Exibe rótulo
+/// numérico apenas quando o modo de visualização de teste está ativado.
 class PlaceholderScreenScaffold extends StatelessWidget {
-  /// Cria um esqueleto funcional padronizado para as telas 4 a 14.
+  /// Cria um esqueleto funcional padronizado para as telas do fluxo.
   const PlaceholderScreenScaffold({
     super.key,
     required this.screenNumber,
@@ -19,8 +20,6 @@ class PlaceholderScreenScaffold extends StatelessWidget {
     required this.description,
     required this.primaryActionLabel,
     required this.primaryRoute,
-    this.assignedDev,
-    this.gitBranch,
     this.primaryIcon = Icons.arrow_forward_rounded,
     this.primaryEnabled = true,
     this.secondaryActionLabel,
@@ -35,20 +34,14 @@ class PlaceholderScreenScaffold extends StatelessWidget {
           'Forneça apenas bodyContent ou slivers, nunca ambos simultaneamente.',
         );
 
-  /// Número identificador da tela no fluxo oficial (4 a 14).
+  /// Número identificador da tela utilizado exclusivamente em visualização de teste.
   final int screenNumber;
 
-  /// Título exibido na `AppBar` e no contexto da tela.
+  /// Título exibido na `AppBar` da tela.
   final String title;
 
-  /// Orientação objetiva sobre o papel funcional da tela no módulo.
+  /// Descrição funcional exibida somente no modo de visualização de teste.
   final String description;
-
-  /// Desenvolvedor responsável conforme a Matriz 4.4 do Manual.
-  final String? assignedDev;
-
-  /// Branch Git designada para o desenvolvimento desta tela.
-  final String? gitBranch;
 
   /// Rótulo do botão principal de avanço ancorado na Zona do Polegar.
   final String primaryActionLabel;
@@ -71,7 +64,7 @@ class PlaceholderScreenScaffold extends StatelessWidget {
   /// Conteúdo interativo principal em telas baseadas em `SingleChildScrollView`.
   final Widget? bodyContent;
 
-  /// Lista opcional de slivers para telas em `CustomScrollView` (ex.: Tela 10).
+  /// Lista opcional de slivers para telas em `CustomScrollView`.
   final List<Widget>? slivers;
 
   /// Callback executado ao pressionar o CTA principal em vez da navegação padrão.
@@ -120,17 +113,15 @@ class PlaceholderScreenScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final descriptor = AppRouter.descriptorFor(screenNumber);
-    final resolvedDev = assignedDev ?? descriptor?.assignedDev ?? 'Equipe';
-    final resolvedBranch = gitBranch ?? descriptor?.gitBranch ?? 'dev';
+    final isTestPreview = AppStateScope.of(context).isTestPreviewMode;
 
-    final metadataBanner = _PlaceholderMetadataBanner(
-      screenNumber: screenNumber,
-      title: title,
-      assignedDev: resolvedDev,
-      gitBranch: resolvedBranch,
-      description: description,
-    );
+    final testPreviewBanner = isTestPreview
+        ? _TestPreviewBanner(
+            screenNumber: screenNumber,
+            title: title,
+            description: description,
+          )
+        : null;
 
     final secondaryButton =
         secondaryActionLabel != null &&
@@ -154,42 +145,29 @@ class PlaceholderScreenScaffold extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: Text(
-          'Tela $screenNumber • $title',
+          isTestPreview ? 'Tela $screenNumber • $title' : title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Voltar para Home',
-            constraints: const BoxConstraints(
-              minWidth: AppDimensions.minTouchTarget,
-              minHeight: AppDimensions.minTouchTarget,
-            ),
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                AppRoutes.homeCustomer,
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.home_outlined),
-          ),
-          const SizedBox(width: AppDimensions.spacingXs),
-        ],
       ),
       body: SafeArea(
         child: slivers != null
             ? CustomScrollView(
                 slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimensions.screenPadding,
-                      AppDimensions.spacingXs,
-                      AppDimensions.screenPadding,
-                      AppDimensions.spacingSm,
+                  if (testPreviewBanner != null)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppDimensions.screenPadding,
+                        AppDimensions.spacingXs,
+                        AppDimensions.screenPadding,
+                        AppDimensions.spacingSm,
+                      ),
+                      sliver: SliverToBoxAdapter(child: testPreviewBanner),
+                    )
+                  else
+                    const SliverPadding(
+                      padding: EdgeInsets.only(top: AppDimensions.spacingXs),
                     ),
-                    sliver: SliverToBoxAdapter(child: metadataBanner),
-                  ),
                   ...slivers!,
                   if (secondaryButton != null)
                     SliverPadding(
@@ -212,11 +190,11 @@ class PlaceholderScreenScaffold extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    metadataBanner,
-                    if (bodyContent != null) ...[
+                    if (testPreviewBanner != null) ...[
+                      testPreviewBanner,
                       const SizedBox(height: AppDimensions.spacingSm),
-                      bodyContent!,
                     ],
+                    if (bodyContent != null) bodyContent!,
                     if (secondaryButton != null) ...[
                       const SizedBox(height: AppDimensions.spacingMd),
                       secondaryButton,
@@ -236,19 +214,15 @@ class PlaceholderScreenScaffold extends StatelessWidget {
   }
 }
 
-class _PlaceholderMetadataBanner extends StatelessWidget {
-  const _PlaceholderMetadataBanner({
+class _TestPreviewBanner extends StatelessWidget {
+  const _TestPreviewBanner({
     required this.screenNumber,
     required this.title,
-    required this.assignedDev,
-    required this.gitBranch,
     required this.description,
   });
 
   final int screenNumber;
   final String title;
-  final String assignedDev;
-  final String gitBranch;
   final String description;
 
   @override
@@ -267,24 +241,20 @@ class _PlaceholderMetadataBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: AppDimensions.spacingXs,
-            runSpacing: AppDimensions.spacingXs,
-            children: [
-              _MetadataPill(
-                icon: Icons.layers_outlined,
-                label: 'Tela $screenNumber',
-                isPrimary: true,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Tela $screenNumber',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              _MetadataPill(
-                icon: Icons.person_outline_rounded,
-                label: assignedDev,
-              ),
-              _MetadataPill(
-                icon: Icons.account_tree_outlined,
-                label: gitBranch,
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: AppDimensions.spacingXs),
           Text(
@@ -299,52 +269,6 @@ class _PlaceholderMetadataBanner extends StatelessWidget {
             description,
             style: textTheme.bodyMedium?.copyWith(
               color: AppColors.onSurface,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetadataPill extends StatelessWidget {
-  const _MetadataPill({
-    required this.icon,
-    required this.label,
-    this.isPrimary = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool isPrimary;
-
-  @override
-  Widget build(BuildContext context) {
-    final background = isPrimary ? AppColors.primary : AppColors.surface;
-    final foreground = isPrimary ? Colors.white : AppColors.primaryDark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-        border: isPrimary ? null : Border.all(color: AppColors.outline),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: foreground),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],
