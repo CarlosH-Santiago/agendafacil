@@ -1,0 +1,71 @@
+# ==============================================================================
+# AgendaFácil (Tema 11) — .gitignore oficial para projetos Flutter/Dart
+# Multiplataforma (Android, iOS, Linux, Windows, macOS, Web) e multi-IDE.
+#
+# IMPORTANTE:
+# `pubspec.lock` NÃO é ignorado intencionalmente porque este repositório
+# representa uma aplicação final: manter o lockfile rastreado garante versões
+# determinísticas de dependências entre todos os desenvolvedores e no Demo Day.
+# ==============================================================================
+
+# --- Build e ferramentas Dart / Flutter ---
+/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/coverage/
+.metadata
+**/doc/api/
+.widget_preview/
+
+# --- Simbolização, ofuscação e artefatos temporários de build ---
+app.*.symbols
+app.*.map.json
+.build/
+.buildlog/
+.swiftpm/
+migrate_working_dir/
+
+# --- Configurações locais de IDEs e editores ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.atom/
+.history
+
+# --- Artefatos gerados de plataformas nativas ---
+# Android
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/.gradle/
+/android/local.properties
+
+# iOS
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/ephemeral/
+
+# Desktop (Linux / Windows / macOS)
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+macos/Flutter/ephemeral/
+
+# --- Sistema Operacional, logs, temporários e controle legado ---
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.class
+*.pyc
+.svn/
+
+# --- Segredos, variáveis de ambiente e assinaturas (AppSec) ---
+.env
+.env.*
+*.jks
+*.keystore
+key.properties
