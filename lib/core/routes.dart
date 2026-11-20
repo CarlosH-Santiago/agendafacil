@@ -85,134 +85,98 @@ abstract final class AppRoutes {
   static const String providerMetrics = providerSettingsRules;
 }
 
-/// Metadado descritivo de cada tela para rastreabilidade da Matriz 4.4 do Manual.
+/// Metadado descritivo de cada tela do aplicativo.
 class RouteDescriptor {
   /// Cria um descritor para o catálogo oficial de rotas.
   const RouteDescriptor({
     required this.screenNumber,
     required this.title,
     required this.routeName,
-    required this.assignedDev,
-    required this.gitBranch,
   });
 
   /// Número sequencial da tela (1 a 14).
   final int screenNumber;
 
-  /// Título oficial da tela conforme Seção 4 do Manual.
+  /// Nome legível da tela.
   final String title;
 
   /// Caminho da rota nomeada correspondente.
   final String routeName;
-
-  /// Desenvolvedor responsável conforme a Matriz 4.4 do Manual.
-  final String assignedDev;
-
-  /// Branch Git designada para a entrega da tela.
-  final String gitBranch;
 }
 
 /// Mapeamento centralizado de rotas nomeadas e transições do aplicativo.
 abstract final class AppRouter {
-  /// Lista ordenada das 14 telas oficiais com atribuição de desenvolvedor e branch.
+  /// Lista ordenada das 14 telas oficiais do fluxo do aplicativo.
   static const List<RouteDescriptor> catalog = [
     RouteDescriptor(
       screenNumber: 1,
       title: 'Splash Screen',
       routeName: AppRoutes.splash,
-      assignedDev: 'Dev 1 (Tech Lead)',
-      gitBranch: 'main / dev',
     ),
     RouteDescriptor(
       screenNumber: 2,
       title: 'Login Progressivo',
       routeName: AppRoutes.login,
-      assignedDev: 'Dev 1 (Tech Lead)',
-      gitBranch: 'main / dev',
     ),
     RouteDescriptor(
       screenNumber: 3,
       title: 'Home / Dashboard do Cliente',
       routeName: AppRoutes.homeCustomer,
-      assignedDev: 'Dev 2',
-      gitBranch: 'feature/home-perfil',
     ),
     RouteDescriptor(
       screenNumber: 4,
       title: 'Perfil e Alternância de Modo',
       routeName: AppRoutes.profileSwitch,
-      assignedDev: 'Dev 2',
-      gitBranch: 'feature/home-perfil',
     ),
     RouteDescriptor(
       screenNumber: 5,
       title: 'Catálogo de Serviços',
       routeName: AppRoutes.catalogServices,
-      assignedDev: 'Dev 3',
-      gitBranch: 'feature/catalogo-grid',
     ),
     RouteDescriptor(
       screenNumber: 6,
       title: 'Detalhes do Profissional / Estúdio',
       routeName: AppRoutes.professionalDetail,
-      assignedDev: 'Dev 3',
-      gitBranch: 'feature/catalogo-grid',
     ),
     RouteDescriptor(
       screenNumber: 7,
       title: 'Seletor de Data e Grid de Horários',
       routeName: AppRoutes.slotSelector,
-      assignedDev: 'Dev 3',
-      gitBranch: 'feature/catalogo-grid',
     ),
     RouteDescriptor(
       screenNumber: 8,
       title: 'Checkout e Resumo da Reserva',
       routeName: AppRoutes.checkout,
-      assignedDev: 'Dev 4',
-      gitBranch: 'feature/checkout',
     ),
     RouteDescriptor(
       screenNumber: 9,
       title: 'Confirmação e Salvar na Agenda',
       routeName: AppRoutes.confirmationSuccess,
-      assignedDev: 'Dev 4',
-      gitBranch: 'feature/checkout',
     ),
     RouteDescriptor(
       screenNumber: 10,
       title: 'Painel da Agenda do Prestador',
       routeName: AppRoutes.providerTimeline,
-      assignedDev: 'Dev 5',
-      gitBranch: 'feature/prestador-historico',
     ),
     RouteDescriptor(
       screenNumber: 11,
       title: 'Controle de Status do Atendimento',
       routeName: AppRoutes.appointmentStatus,
-      assignedDev: 'Dev 5',
-      gitBranch: 'feature/prestador-historico',
     ),
     RouteDescriptor(
       screenNumber: 12,
       title: 'Histórico Unificado de Reservas',
       routeName: AppRoutes.customerHistory,
-      assignedDev: 'Dev 5',
-      gitBranch: 'feature/prestador-historico',
     ),
     RouteDescriptor(
       screenNumber: 13,
-      title: 'Tela de Avaliação do Serviço',
+      title: 'Avaliação do Serviço',
       routeName: AppRoutes.ratingReview,
-      assignedDev: 'Dev 5',
-      gitBranch: 'feature/prestador-historico',
     ),
     RouteDescriptor(
       screenNumber: 14,
       title: 'Configuração de Regras e Políticas',
       routeName: AppRoutes.providerSettingsRules,
-      assignedDev: 'Dev 5',
-      gitBranch: 'feature/prestador-historico',
     ),
   ];
 
