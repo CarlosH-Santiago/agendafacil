@@ -7,16 +7,8 @@ import '../models/appointment_model.dart';
 import '../models/service_model.dart';
 import '../state/app_state.dart';
 import '../widgets/service_item_card.dart';
-import '../widgets/slot_filter_chip.dart';
 
-/// Tela 3 — Home / Dashboard Principal do Cliente (SSOT).
-///
-/// Concentra barra de busca em tempo real, carrossel de categorias com
-/// [AgendaFilterChip], cartão de destaque do próximo agendamento com
-/// [AppointmentStatusBadge] e atalho "Reagendar em 1 toque" (Heurística 7),
-/// catálogo com [ServiceItemCard] e [NavigationBar] conectando Telas 3, 5, 12 e 4.
 class HomeCustomerView extends StatefulWidget {
-  /// Cria o dashboard do cliente [HomeCustomerView].
   const HomeCustomerView({super.key});
 
   @override
@@ -36,20 +28,6 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _toggleProfileAndNavigate(AppState appState) {
-    HapticFeedback.selectionClick();
-    appState.alternarPerfil(UserProfile.prestador);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          duration: Duration(seconds: 2),
-          content: Text('Modo Prestador ativado.'),
-        ),
-      );
-    Navigator.of(context).pushNamed(AppRoutes.providerTimeline);
   }
 
   void _handleOneTapRebook(AppState appState, AppointmentModel? reference) {
@@ -72,66 +50,128 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
     );
   }
 
-  void _openTestScreensSheet() {
+  Future<void> _confirmCancelAppointment(
+    AppState appState,
+    AppointmentModel appointment,
+  ) async {
     HapticFeedback.selectionClick();
-    final previewItems = AppRouter.catalog
-        .where(
-          (item) =>
-              item.routeName != AppRoutes.splash &&
-              item.routeName != AppRoutes.profileSwitch,
-        )
-        .toList(growable: false);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Cancelar agendamento?'),
+          content: Text(
+            'Deseja cancelar "${appointment.servicoNome}" marcado para '
+            '${appointment.dataFormatada} às ${appointment.hora}? '
+            'O horário voltará a ficar livre.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Manter'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(
+                  AppDimensions.minTouchTarget,
+                  AppDimensions.minTouchTarget,
+                ),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Confirmar cancelamento'),
+            ),
+          ],
+        );
+      },
+    );
 
+    if (confirmed != true || !mounted) return;
+    appState.alterarStatusAgendamento(
+      appointment.id,
+      AppointmentStatus.cancelado,
+    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          duration: Duration(seconds: 2),
+          content: Text('Agendamento cancelado e horário liberado.'),
+        ),
+      );
+  }
+
+  void _openNotificationsSheet(AppState appState) {
+    HapticFeedback.selectionClick();
+    final active = appState.agendamentosAtivos;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      isScrollControlled: true,
       builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.68,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          builder: (_, scrollController) {
-            return ListView.separated(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(
-                AppDimensions.screenPadding,
-                4,
-                AppDimensions.screenPadding,
-                AppDimensions.spacingMd,
-              ),
-              itemCount: previewItems.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppDimensions.spacingXs),
-              itemBuilder: (context, index) {
-                final descriptor = previewItems[index];
-                return ListTile(
-                  minVerticalPadding: 12,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.controlRadius,
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppDimensions.screenPadding,
+              4,
+              AppDimensions.screenPadding,
+              AppDimensions.spacingMd,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Notificações e Lembretes',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppDimensions.spacingXs),
+                if (active.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppDimensions.spacingSm,
                     ),
-                    side: const BorderSide(color: AppColors.outline),
+                    child: Text(
+                      'Nenhum lembrete pendente no momento.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                else
+                  ...active.map(
+                    (apt) => Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: AppDimensions.spacingXs,
+                      ),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.controlRadius,
+                          ),
+                          side: const BorderSide(color: AppColors.outline),
+                        ),
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.primaryContainer,
+                          foregroundColor: AppColors.primaryDark,
+                          child: Icon(Icons.notifications_active_outlined),
+                        ),
+                        title: Text(
+                          apt.servicoNome,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${apt.dataFormatada} às ${apt.hora} • ${apt.prestador}',
+                        ),
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          Navigator.of(context)
+                              .pushNamed(AppRoutes.customerHistory);
+                        },
+                      ),
+                    ),
                   ),
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.primaryDark,
-                    child: Text('${descriptor.screenNumber}'),
-                  ),
-                  title: Text(
-                    'Tela ${descriptor.screenNumber} • ${descriptor.title}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    Navigator.of(context).pushNamed(descriptor.routeName);
-                  },
-                );
-              },
-            );
-          },
+              ],
+            ),
+          ),
         );
       },
     );
@@ -142,75 +182,81 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
     final appState = AppStateScope.of(context);
     final textTheme = Theme.of(context).textTheme;
     final nextAppointment = appState.proximoAgendamento;
+    final allAppointments = appState.appointments;
     final lastAppointment = nextAppointment ??
-        (appState.appointments.isNotEmpty ? appState.appointments.first : null);
+        (allAppointments.isNotEmpty ? allAppointments.first : null);
     final filteredServices = appState.filteredServices;
+    final recentAppointments = allAppointments
+        .where((apt) => apt.id != nextAppointment?.id)
+        .toList(growable: false);
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: AppDimensions.screenPadding,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Olá, ${appState.userName}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleLarge,
-            ),
-            Text(
-              appState.isGuest
-                  ? 'Modo Visitante • Cliente'
-                  : 'Perfil ${appState.activeProfile.label}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _toggleProfileAndNavigate(appState),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(
-                AppDimensions.minTouchTarget,
-                AppDimensions.minTouchTarget,
-              ),
-            ),
-            icon: const Icon(Icons.swap_horiz_rounded, size: 20),
-            label: const Text('Prestador'),
-          ),
-          if (appState.isTestPreviewMode)
-            IconButton(
-              tooltip: 'Visualização de teste',
-              constraints: const BoxConstraints(
-                minWidth: AppDimensions.minTouchTarget,
-                minHeight: AppDimensions.minTouchTarget,
-              ),
-              onPressed: _openTestScreensSheet,
-              icon: const Icon(Icons.grid_view_rounded),
-            ),
-          const SizedBox(width: AppDimensions.spacingXs),
-        ],
-      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppDimensions.screenPadding,
-            AppDimensions.spacingXs,
+            AppDimensions.spacingSm,
             AppDimensions.screenPadding,
             AppDimensions.spacingMd,
           ),
           children: [
-            // Campo de busca com resposta instantânea (< 100 ms).
+            // Cabeçalho: Saudação + Notificações + Perfil (Tela 4).
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Olá, ${appState.userName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        appState.isGuest
+                            ? 'Modo Visitante • Agende sem cadastro'
+                            : 'Bem-vindo de volta ao AgendaFácil',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.spacingXs),
+                _HeaderCircleButton(
+                  tooltip: 'Notificações',
+                  icon: Icons.notifications_none_rounded,
+                  hasBadge: appState.agendamentosAtivos.isNotEmpty,
+                  onPressed: () => _openNotificationsSheet(appState),
+                ),
+                const SizedBox(width: AppDimensions.spacingXs),
+                _HeaderCircleButton(
+                  tooltip: 'Perfil e alternância de modo',
+                  icon: Icons.person_outline_rounded,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).pushNamed(AppRoutes.profileSwitch);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.spacingSm),
+
+            // Barra de busca em tempo real (< 100 ms).
             TextField(
               controller: _searchController,
               onChanged: appState.atualizarBusca,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Buscar corte, barba, estética...',
-                prefixIcon: const Icon(Icons.search_rounded),
+                hintText: 'Buscar serviços, profissionais...',
+                fillColor: AppColors.surfaceVariant,
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: AppColors.onSurfaceVariant,
+                ),
                 suffixIcon: appState.searchQuery.isNotEmpty
                     ? IconButton(
                         tooltip: 'Limpar busca',
@@ -230,55 +276,20 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
             ),
             const SizedBox(height: AppDimensions.spacingMd),
 
-            // Cartão em destaque: Próximo agendamento.
-            Text(
-              'Próximo agendamento',
-              style: textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            _NextAppointmentCard(
-              appointment: nextAppointment,
-              canRebookLast: lastAppointment != null,
-              onOneTapRebook: () =>
-                  _handleOneTapRebook(appState, lastAppointment),
-              onManage: () {
-                HapticFeedback.selectionClick();
-                Navigator.of(context).pushNamed(AppRoutes.customerHistory);
-              },
-              onBookNew: () {
-                HapticFeedback.selectionClick();
-                Navigator.of(context).pushNamed(AppRoutes.catalogServices);
-              },
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-
-            // Carrossel horizontal de categorias com AgendaFilterChip.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Categorias', style: textTheme.titleLarge),
-                TextButton(
-                  onPressed: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).pushNamed(AppRoutes.catalogServices);
-                  },
-                  child: const Text('Ver tudo'),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
+            // Carrossel horizontal de categorias circulares (>= 48x48 dp).
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AgendaFilterChip(
+                  _CategoryCircleItem(
                     label: 'Todos',
                     icon: Icons.apps_rounded,
                     selected: appState.selectedCategory == null,
                     onTap: () => appState.selecionarCategoria(null),
                   ),
-                  const SizedBox(width: AppDimensions.spacingXs),
-                  AgendaFilterChip(
+                  const SizedBox(width: AppDimensions.spacingSm),
+                  _CategoryCircleItem(
                     label: ServiceCategory.cabelo.label,
                     icon: Icons.content_cut_rounded,
                     selected:
@@ -286,8 +297,8 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                     onTap: () =>
                         appState.selecionarCategoria(ServiceCategory.cabelo),
                   ),
-                  const SizedBox(width: AppDimensions.spacingXs),
-                  AgendaFilterChip(
+                  const SizedBox(width: AppDimensions.spacingSm),
+                  _CategoryCircleItem(
                     label: ServiceCategory.barba.label,
                     icon: Icons.face_retouching_natural_rounded,
                     selected:
@@ -295,10 +306,10 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                     onTap: () =>
                         appState.selecionarCategoria(ServiceCategory.barba),
                   ),
-                  const SizedBox(width: AppDimensions.spacingXs),
-                  AgendaFilterChip(
+                  const SizedBox(width: AppDimensions.spacingSm),
+                  _CategoryCircleItem(
                     label: ServiceCategory.estetica.label,
-                    icon: Icons.spa_rounded,
+                    icon: Icons.spa_outlined,
                     selected:
                         appState.selectedCategory == ServiceCategory.estetica,
                     onTap: () =>
@@ -309,14 +320,86 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
             ),
             const SizedBox(height: AppDimensions.spacingMd),
 
-            // Lista de serviços com componente reutilizável ServiceItemCard.
+            // Próximo agendamento (Card de destaque conforme Wireframe + Heurística 7).
+            Text(
+              'Próximo agendamento',
+              style: textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppDimensions.spacingXs),
+            _NextAppointmentHighlightCard(
+              appointment: nextAppointment,
+              canRebookLast: lastAppointment != null,
+              onOneTapRebook: () =>
+                  _handleOneTapRebook(appState, lastAppointment),
+              onManage: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).pushNamed(AppRoutes.customerHistory);
+              },
+              onCancel: nextAppointment == null
+                  ? null
+                  : () => _confirmCancelAppointment(appState, nextAppointment),
+              onBookNew: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).pushNamed(AppRoutes.catalogServices);
+              },
+            ),
+            const SizedBox(height: AppDimensions.spacingMd),
+
+            // Populares perto de você (Carrossel horizontal do Wireframe).
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Populares perto de você',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleLarge,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).pushNamed(AppRoutes.catalogServices);
+                  },
+                  child: const Text('Ver todos'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.spacingXs),
+            SizedBox(
+              height: 184,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: appState.services.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppDimensions.spacingXs),
+                itemBuilder: (context, index) {
+                  final service = appState.services[index];
+                  final distanceKm = (1.2 + index * 0.6).toStringAsFixed(1);
+                  return _PopularPlaceCard(
+                    service: service,
+                    distanceLabel: '$distanceKm km',
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      appState.selecionarServico(service);
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.professionalDetail);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppDimensions.spacingMd),
+
+            // Serviços disponíveis (lista filtrada reativamente).
             Text(
               'Serviços disponíveis (${filteredServices.length})',
               style: textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.spacingXs),
             if (filteredServices.isEmpty)
-              _EmptySearchCard(
+              _EmptyFilterCard(
                 onReset: () {
                   HapticFeedback.selectionClick();
                   _searchController.clear();
@@ -333,9 +416,8 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                     onTap: () {
                       HapticFeedback.selectionClick();
                       appState.selecionarServico(service);
-                      Navigator.of(context).pushNamed(
-                        AppRoutes.professionalDetail,
-                      );
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.professionalDetail);
                     },
                     onBookPressed: () {
                       HapticFeedback.selectionClick();
@@ -345,6 +427,49 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                   ),
                 ),
               ),
+
+            // Seus últimos agendamentos (conforme Wireframe).
+            if (recentAppointments.isNotEmpty) ...[
+              const SizedBox(height: AppDimensions.spacingXs),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Seus últimos agendamentos',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleLarge,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.customerHistory);
+                    },
+                    child: const Text('Histórico'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.spacingXs),
+              ...recentAppointments.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: AppDimensions.spacingXs,
+                  ),
+                  child: _RecentAppointmentTile(
+                    appointment: item,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.customerHistory);
+                    },
+                    onRebook: () => _handleOneTapRebook(appState, item),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -358,8 +483,10 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
             case 1:
               Navigator.of(context).pushNamed(AppRoutes.catalogServices);
             case 2:
-              Navigator.of(context).pushNamed(AppRoutes.customerHistory);
+              Navigator.of(context).pushNamed(AppRoutes.slotSelector);
             case 3:
+              Navigator.of(context).pushNamed(AppRoutes.customerHistory);
+            case 4:
               Navigator.of(context).pushNamed(AppRoutes.profileSwitch);
           }
         },
@@ -370,13 +497,18 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
             label: 'Início',
           ),
           NavigationDestination(
-            icon: Icon(Icons.store_mall_directory_outlined),
-            selectedIcon: Icon(Icons.store_mall_directory_rounded),
-            label: 'Catálogo',
+            icon: Icon(Icons.search_rounded),
+            selectedIcon: Icon(Icons.manage_search_rounded),
+            label: 'Buscar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined),
+            selectedIcon: Icon(Icons.calendar_today_rounded),
+            label: 'Agenda',
           ),
           NavigationDestination(
             icon: Icon(Icons.history_rounded),
-            selectedIcon: Icon(Icons.calendar_today_rounded),
+            selectedIcon: Icon(Icons.history_toggle_off_rounded),
             label: 'Histórico',
           ),
           NavigationDestination(
@@ -390,12 +522,147 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
   }
 }
 
-class _NextAppointmentCard extends StatelessWidget {
-  const _NextAppointmentCard({
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.hasBadge = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool hasBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: AppColors.surfaceVariant,
+          shape: const CircleBorder(
+            side: BorderSide(color: AppColors.outline),
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: SizedBox(
+              width: AppDimensions.minTouchTarget,
+              height: AppDimensions.minTouchTarget,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(icon, color: AppColors.onSurface, size: 22),
+                  if (hasBadge)
+                    Positioned(
+                      top: 11,
+                      right: 11,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryCircleItem extends StatelessWidget {
+  const _CategoryCircleItem({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final circleColor =
+        selected ? AppColors.primaryContainer : AppColors.surfaceVariant;
+    final borderColor = selected ? AppColors.primary : AppColors.outline;
+    final iconColor = selected ? AppColors.primaryDark : AppColors.onSurface;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Categoria $label',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDimensions.controlRadius),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: 68,
+            minHeight: AppDimensions.minTouchTarget,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: AppDurations.instantFeedback,
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: circleColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: borderColor,
+                      width: selected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 24),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected
+                        ? AppColors.primaryDark
+                        : AppColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NextAppointmentHighlightCard extends StatelessWidget {
+  const _NextAppointmentHighlightCard({
     required this.appointment,
     required this.canRebookLast,
     required this.onOneTapRebook,
     required this.onManage,
+    required this.onCancel,
     required this.onBookNew,
   });
 
@@ -403,6 +670,7 @@ class _NextAppointmentCard extends StatelessWidget {
   final bool canRebookLast;
   final VoidCallback onOneTapRebook;
   final VoidCallback onManage;
+  final VoidCallback? onCancel;
   final VoidCallback onBookNew;
 
   @override
@@ -411,6 +679,7 @@ class _NextAppointmentCard extends StatelessWidget {
 
     if (appointment == null) {
       return Card(
+        color: AppColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.spacingSm),
           child: Column(
@@ -422,9 +691,9 @@ class _NextAppointmentCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                'Escolha um serviço abaixo ou repita seu último procedimento em 1 toque.',
+                'Escolha um serviço abaixo ou repita seu último atendimento em 1 toque.',
                 style: textTheme.bodyMedium,
               ),
               const SizedBox(height: AppDimensions.spacingSm),
@@ -458,117 +727,331 @@ class _NextAppointmentCard extends StatelessWidget {
     }
 
     final item = appointment!;
-    return Container(
-      padding: const EdgeInsets.all(AppDimensions.spacingSm),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              AppointmentStatusBadge(status: item.status),
-              const SizedBox(width: AppDimensions.spacingXs),
-              Expanded(
-                child: Text(
-                  '${item.dataFormatada} • ${item.hora}',
-                  textAlign: TextAlign.end,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+    return Card(
+      color: AppColors.surface,
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.spacingSm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.servicoNome,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Profissional: ${item.prestador}',
+                        style: textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(width: AppDimensions.spacingXs),
+                AppointmentStatusBadge(status: item.status),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: AppColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppDimensions.spacingXs),
+                Expanded(
+                  child: Text(
+                    '${item.dataFormatada} • ${item.hora}',
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: AppColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppDimensions.spacingXs),
+                Expanded(
+                  child: Text(
+                    item.prestador,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.spacingSm),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final rebookBtn = OutlinedButton.icon(
+                  onPressed: onOneTapRebook,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    minimumSize: const Size(
+                      AppDimensions.minTouchTarget,
+                      AppDimensions.minTouchTarget,
+                    ),
+                  ),
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  label: const Text(
+                    'Reagendar em 1 toque',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                final manageBtn = OutlinedButton(
+                  onPressed: onManage,
+                  onLongPress: onCancel,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.onSurface,
+                    side: const BorderSide(color: AppColors.outline, width: 1),
+                    minimumSize: const Size(
+                      AppDimensions.minTouchTarget,
+                      AppDimensions.minTouchTarget,
+                    ),
+                  ),
+                  child: const Text(
+                    'Gerenciar',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                if (constraints.maxWidth < 310) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      rebookBtn,
+                      const SizedBox(height: AppDimensions.spacingXs),
+                      manageBtn,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(flex: 3, child: rebookBtn),
+                    const SizedBox(width: AppDimensions.spacingXs),
+                    Expanded(flex: 2, child: manageBtn),
+                  ],
+                );
+              },
+            ),
+            if (onCancel != null) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onCancel,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Cancelar agendamento'),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            item.servicoNome,
-            style: textTheme.titleLarge?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            item.prestador,
-            style: TextStyle(
-              color: Colors.white.withAlpha(230),
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: AppDimensions.spacingSm),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final rebookButton = FilledButton.icon(
-                onPressed: onOneTapRebook,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryDark,
-                  minimumSize: const Size(
-                    AppDimensions.minTouchTarget,
-                    AppDimensions.minTouchTarget,
-                  ),
-                ),
-                icon: const Icon(Icons.replay_rounded, size: 18),
-                label: const Text(
-                  'Reagendar em 1 toque',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-
-              final manageButton = OutlinedButton(
-                onPressed: onManage,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white, width: 1.5),
-                  minimumSize: const Size(
-                    AppDimensions.minTouchTarget,
-                    AppDimensions.minTouchTarget,
-                  ),
-                ),
-                child: const Text(
-                  'Gerenciar',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-
-              if (constraints.maxWidth < 310) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    rebookButton,
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    manageButton,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(flex: 3, child: rebookButton),
-                  const SizedBox(width: AppDimensions.spacingXs),
-                  Expanded(flex: 2, child: manageButton),
-                ],
-              );
-            },
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _EmptySearchCard extends StatelessWidget {
-  const _EmptySearchCard({required this.onReset});
+class _PopularPlaceCard extends StatelessWidget {
+  const _PopularPlaceCard({
+    required this.service,
+    required this.distanceLabel,
+    required this.onTap,
+  });
+
+  final ServiceModel service;
+  final String distanceLabel;
+  final VoidCallback onTap;
+
+  IconData _iconForCategory(ServiceCategory category) {
+    switch (category) {
+      case ServiceCategory.cabelo:
+        return Icons.content_cut_rounded;
+      case ServiceCategory.barba:
+        return Icons.face_retouching_natural_rounded;
+      case ServiceCategory.estetica:
+        return Icons.spa_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      width: 176,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 76,
+                width: double.infinity,
+                color: AppColors.surfaceVariant,
+                alignment: Alignment.center,
+                child: Icon(
+                  _iconForCategory(service.categoria),
+                  size: 30,
+                  color: AppColors.primary,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service.prestadorNome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          service.avaliacao.toStringAsFixed(1),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '• ${service.categoria.label}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      distanceLabel,
+                      style: textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentAppointmentTile extends StatelessWidget {
+  const _RecentAppointmentTile({
+    required this.appointment,
+    required this.onTap,
+    required this.onRebook,
+  });
+
+  final AppointmentModel appointment;
+  final VoidCallback onTap;
+  final VoidCallback onRebook;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppDimensions.spacingSm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          appointment.servicoNome,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          appointment.prestador,
+                          style: textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${appointment.dataFormatada} às ${appointment.hora}',
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppDimensions.spacingXs),
+                  AppointmentStatusBadge(status: appointment.status),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onRebook,
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  label: const Text('Reagendar em 1 toque'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyFilterCard extends StatelessWidget {
+  const _EmptyFilterCard({required this.onReset});
 
   final VoidCallback onReset;
 
