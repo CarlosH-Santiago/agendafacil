@@ -51,15 +51,40 @@ class _LoginViewState extends State<LoginView> {
     Navigator.of(context).pushReplacementNamed(AppRoutes.homeCustomer);
   }
 
+  void _applyTestAccount(TestAccount account) {
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    setState(() {
+      _selectedProfile = account.perfil;
+      _emailController.text = account.email;
+      _passwordController.text = account.senha;
+    });
+  }
+
   void _submitCredentials() {
     HapticFeedback.selectionClick();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final appState = AppStateScope.read(context);
-    appState.autenticarComEmail(
+    final authenticated = appState.autenticarComCredenciais(
       _emailController.text,
+      _passwordController.text,
       perfil: _selectedProfile,
     );
+
+    if (!authenticated) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text(
+              'Senha incorreta para a conta de teste. Use 123456.',
+            ),
+          ),
+        );
+      return;
+    }
 
     if (_selectedProfile == UserProfile.prestador) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -278,6 +303,60 @@ class _LoginViewState extends State<LoginView> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: AppDimensions.spacingSm),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.controlRadius,
+                        ),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Contas de teste disponíveis (senha: 123456)',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: AppDimensions.spacingXs,
+                            runSpacing: AppDimensions.spacingXs,
+                            children: AppState.contasTeste.map((account) {
+                              return ActionChip(
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.padded,
+                                avatar: Icon(
+                                  account.perfil == UserProfile.prestador
+                                      ? Icons.storefront_outlined
+                                      : Icons.person_outline_rounded,
+                                  size: 18,
+                                  color: AppColors.primaryDark,
+                                ),
+                                label: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
+                                  child: Text(account.rotulo),
+                                ),
+                                onPressed: () => _applyTestAccount(account),
+                              );
+                            }).toList(growable: false),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Cliente: ${AppState.contaClienteTeste.email}\n'
+                            'Prestador: ${AppState.contaPrestadorTeste.email}',
+                            style: textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: AppDimensions.spacingMd),
                     PrimaryCtaButton(

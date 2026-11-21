@@ -52,6 +52,10 @@ void main() {
     expect(find.text('Reagendar em 1 toque'), findsOneWidget);
     expect(find.text('Gerenciar'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byTooltip('Mapa das 14 telas'), findsNothing);
+    expect(find.byTooltip('Visualização de teste'), findsNothing);
+    expect(find.textContaining('Dev '), findsNothing);
+    expect(find.textContaining('Tela '), findsNothing);
 
     final firstChipSize = tester.getSize(find.byType(AgendaFilterChip).first);
     expect(firstChipSize.width, greaterThanOrEqualTo(AppDimensions.minTouchTarget));
@@ -230,6 +234,80 @@ void main() {
     expect(tester.widget<FilledButton>(proceedFinder).onPressed, isNotNull);
   });
 
+  testWidgets(
+      'Login com credenciais de teste autentica Cliente/Prestador e oculta '
+      'rótulos de Tela/Dev', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final state = AppState()..definirModoVisualizacaoTeste(true);
+    expect(state.isTestPreviewMode, isTrue);
+
+    await tester.pumpWidget(
+      AgendaFacilApp(
+        appState: state,
+        initialRoute: AppRoutes.login,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tenta entrar com senha errada na conta de teste de cliente.
+    await tester.ensureVisible(find.text('Cliente Teste'));
+    await tester.tap(find.text('Cliente Teste'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Senha'),
+      '0000',
+    );
+    await tester.ensureVisible(find.text('Entrar com E-mail'));
+    await tester.tap(find.text('Entrar com E-mail'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Senha incorreta para a conta de teste. Use 123456.'),
+      findsOneWidget,
+    );
+
+    // Preenche a conta de teste correta em 1 toque e entra como Cliente.
+    await tester.ensureVisible(find.text('Cliente Teste'));
+    await tester.tap(find.text('Cliente Teste'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Entrar com E-mail'));
+    await tester.tap(find.text('Entrar com E-mail'));
+    await tester.pumpAndSettle();
+
+    expect(state.isTestPreviewMode, isFalse);
+    expect(find.text('Olá, Carlos Almeida'), findsOneWidget);
+    expect(find.byTooltip('Visualização de teste'), findsNothing);
+    expect(find.textContaining('Tela '), findsNothing);
+    expect(find.textContaining('Dev '), findsNothing);
+
+    // Testa autenticação com credencial de Prestador Teste.
+    final providerState = AppState()..definirModoVisualizacaoTeste(true);
+    await tester.pumpWidget(
+      AgendaFacilApp(
+        key: UniqueKey(),
+        appState: providerState,
+        initialRoute: AppRoutes.login,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Prestador Teste'));
+    await tester.tap(find.text('Prestador Teste'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Entrar como Prestador'));
+    await tester.tap(find.text('Entrar como Prestador'));
+    await tester.pumpAndSettle();
+
+    expect(providerState.isTestPreviewMode, isFalse);
+    expect(providerState.activeProfile, UserProfile.prestador);
+    expect(find.text('Agenda do Prestador'), findsOneWidget);
+    expect(find.textContaining('Tela '), findsNothing);
+    expect(find.textContaining('Dev '), findsNothing);
+  });
+
   testWidgets('Fluxo completo: Home -> Reagendar -> Checkout -> Confirmação',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -248,13 +326,15 @@ void main() {
     await tester.tap(find.text('Reagendar em 1 toque'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tela 8 • Checkout e Resumo'), findsOneWidget);
+    expect(find.text('Checkout e Resumo'), findsOneWidget);
+    expect(find.textContaining('Tela '), findsNothing);
     expect(find.text('Confirmar agendamento'), findsOneWidget);
 
     await tester.tap(find.text('Confirmar agendamento'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tela 9 • Agendamento Confirmado'), findsOneWidget);
+    expect(find.text('Agendamento Confirmado'), findsOneWidget);
+    expect(find.textContaining('Tela '), findsNothing);
     expect(find.text('Salvar na Agenda do Celular'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Salvar na Agenda do Celular'));
@@ -262,6 +342,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Salvo na Agenda do Celular'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Modo visualização de teste exibe apenas Tela X sem indicação de Dev',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final state = AppState()..definirModoVisualizacaoTeste(true);
+    await tester.pumpWidget(
+      AgendaFacilApp(
+        appState: state,
+        initialRoute: AppRoutes.checkout,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tela 8 • Checkout e Resumo'), findsOneWidget);
+    expect(find.text('Tela 8'), findsOneWidget);
+    expect(find.textContaining('Dev '), findsNothing);
   });
 
   testWidgets('Todas as 14 rotas e aliases funcionam sem overflow em tela compacta',

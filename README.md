@@ -126,6 +126,16 @@ lib/
 
 ---
 
+### Credenciais de Login para Testes
+
+| Perfil | E-mail | Senha | Observação |
+| :--- | :--- | :--- | :--- |
+| **Cliente Teste** | `cliente@agendafacil.com` | `123456` | Acesso completo ao funil de cliente sem rótulos de teste/dev |
+| **Prestador Teste** | `prestador@agendafacil.com` | `123456` | Abre diretamente o painel operacional em linha do tempo vertical |
+| **Visitante** | *(Botão "Entrar como Visitante")* | — | Autenticação progressiva sem cadastro prévio |
+
+---
+
 ## Pré-requisitos e Execução Local
 
 ### Pré-requisitos

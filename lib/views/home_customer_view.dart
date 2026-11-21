@@ -72,8 +72,16 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
     );
   }
 
-  void _openAllRoutesSheet() {
+  void _openTestScreensSheet() {
     HapticFeedback.selectionClick();
+    final previewItems = AppRouter.catalog
+        .where(
+          (item) =>
+              item.routeName != AppRoutes.splash &&
+              item.routeName != AppRoutes.profileSwitch,
+        )
+        .toList(growable: false);
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -93,11 +101,11 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                 AppDimensions.screenPadding,
                 AppDimensions.spacingMd,
               ),
-              itemCount: AppRouter.catalog.length,
+              itemCount: previewItems.length,
               separatorBuilder: (_, __) =>
                   const SizedBox(height: AppDimensions.spacingXs),
               itemBuilder: (context, index) {
-                final descriptor = AppRouter.catalog[index];
+                final descriptor = previewItems[index];
                 return ListTile(
                   minVerticalPadding: 12,
                   shape: RoundedRectangleBorder(
@@ -112,11 +120,8 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
                     child: Text('${descriptor.screenNumber}'),
                   ),
                   title: Text(
-                    descriptor.title,
+                    'Tela ${descriptor.screenNumber} • ${descriptor.title}',
                     style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    '${descriptor.assignedDev} • ${descriptor.gitBranch}',
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () {
@@ -176,15 +181,16 @@ class _HomeCustomerViewState extends State<HomeCustomerView> {
             icon: const Icon(Icons.swap_horiz_rounded, size: 20),
             label: const Text('Prestador'),
           ),
-          IconButton(
-            tooltip: 'Mapa das 14 telas',
-            constraints: const BoxConstraints(
-              minWidth: AppDimensions.minTouchTarget,
-              minHeight: AppDimensions.minTouchTarget,
+          if (appState.isTestPreviewMode)
+            IconButton(
+              tooltip: 'Visualização de teste',
+              constraints: const BoxConstraints(
+                minWidth: AppDimensions.minTouchTarget,
+                minHeight: AppDimensions.minTouchTarget,
+              ),
+              onPressed: _openTestScreensSheet,
+              icon: const Icon(Icons.grid_view_rounded),
             ),
-            onPressed: _openAllRoutesSheet,
-            icon: const Icon(Icons.grid_view_rounded),
-          ),
           const SizedBox(width: AppDimensions.spacingXs),
         ],
       ),

@@ -36,6 +36,33 @@ enum DayPeriod {
   final String label;
 }
 
+/// Credencial pré-cadastrada para validação do fluxo autenticado em testes.
+class TestAccount {
+  /// Cria uma conta de teste imutável com [email], [senha], [nome] e [perfil].
+  const TestAccount({
+    required this.email,
+    required this.senha,
+    required this.nome,
+    required this.perfil,
+    required this.rotulo,
+  });
+
+  /// E-mail aceito no formulário de login.
+  final String email;
+
+  /// Senha esperada para autenticação da conta de teste.
+  final String senha;
+
+  /// Nome exibido na saudação e nos novos agendamentos.
+  final String nome;
+
+  /// Perfil padrão associado à conta de teste.
+  final UserProfile perfil;
+
+  /// Rótulo curto exibido no atalho de preenchimento na tela de login.
+  final String rotulo;
+}
+
 /// Modelo imutável que representa um horário na grade de agendamentos.
 class TimeSlotModel {
   /// Cria uma instância de [TimeSlotModel].
@@ -218,6 +245,7 @@ class AppState extends ChangeNotifier {
 
   UserProfile _activeProfile = UserProfile.cliente;
   bool _isGuest = true;
+  bool _isTestPreviewMode = false;
   String _userName = 'Visitante';
   String _userEmail = '';
   String _searchQuery = '';
@@ -228,11 +256,38 @@ class AppState extends ChangeNotifier {
   int _janelaCancelamentoHoras = 2;
   int _toleranciaAtrasoMinutos = 15;
 
+  /// Conta de cliente pré-cadastrada para testes manuais e automatizados.
+  static const TestAccount contaClienteTeste = TestAccount(
+    email: 'cliente@agendafacil.com',
+    senha: '123456',
+    nome: 'Carlos Almeida',
+    perfil: UserProfile.cliente,
+    rotulo: 'Cliente Teste',
+  );
+
+  /// Conta de prestador pré-cadastrada para testes manuais e automatizados.
+  static const TestAccount contaPrestadorTeste = TestAccount(
+    email: 'prestador@agendafacil.com',
+    senha: '123456',
+    nome: 'Lucas Barbeiro',
+    perfil: UserProfile.prestador,
+    rotulo: 'Prestador Teste',
+  );
+
+  /// Lista oficial das contas de teste disponíveis na tela de autenticação.
+  static const List<TestAccount> contasTeste = [
+    contaClienteTeste,
+    contaPrestadorTeste,
+  ];
+
   /// Perfil ativo no momento ([UserProfile.cliente] ou [UserProfile.prestador]).
   UserProfile get activeProfile => _activeProfile;
 
   /// Indica se o usuário entrou utilizando o fluxo progressivo de visitante.
   bool get isGuest => _isGuest;
+
+  /// Indica se o modo de visualização de teste com rótulos "Tela X" está ativo.
+  bool get isTestPreviewMode => _isTestPreviewMode;
 
   /// Nome exibido nas saudações e novos agendamentos do cliente.
   String get userName => _userName;
@@ -338,9 +393,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Autentica no modo visitante com fricção zero.
+  /// Ativa ou desativa o modo de visualização de teste com prefixos "Tela X".
+  void definirModoVisualizacaoTeste(bool ativo) {
+    if (_isTestPreviewMode == ativo) return;
+    _isTestPreviewMode = ativo;
+    notifyListeners();
+  }
+
+  /// Autentica no modo visitante com fricção zero e desativa rótulos de teste.
   void entrarComoVisitante() {
     _isGuest = true;
+    _isTestPreviewMode = false;
     _userName = 'Visitante';
     _userEmail = '';
     _activeProfile = UserProfile.cliente;
@@ -350,20 +413,70 @@ class AppState extends ChangeNotifier {
   /// Autentica com o [email] informado no formulário e opcionalmente define [perfil].
   void autenticarComEmail(String email, {UserProfile? perfil}) {
     final cleanEmail = email.trim();
+    final matchedAccount = _findTestAccount(cleanEmail);
     final extractedName = cleanEmail.contains('@')
         ? cleanEmail.split('@').first
         : (cleanEmail.isEmpty ? 'Cliente' : cleanEmail);
-    final formattedName = extractedName.isEmpty
-        ? 'Cliente'
-        : '${extractedName[0].toUpperCase()}${extractedName.substring(1)}';
+    final formattedName = matchedAccount?.nome ??
+        (extractedName.isEmpty
+            ? 'Cliente'
+            : '${extractedName[0].toUpperCase()}${extractedName.substring(1)}');
 
     _isGuest = false;
-    _userEmail = cleanEmail;
+    _isTestPreviewMode = false;
+    _userEmail = matchedAccount?.email ?? cleanEmail;
     _userName = formattedName;
     if (perfil != null) {
       _activeProfile = perfil;
+    } else if (matchedAccount != null) {
+      _activeProfile = matchedAccount.perfil;
     }
     notifyListeners();
+  }
+
+  /// Valida [email] e [senha] contra as contas de teste ou credencial genérica.
+  ///
+  /// Retorna `true` quando autenticado com sucesso e garante a desativação do
+  /// modo de visualização de teste no fluxo logado.
+  bool autenticarComCredenciais(
+    String email,
+    String senha, {
+    UserProfile? perfil,
+  }) {
+    final cleanEmail = email.trim();
+    final matchedAccount = _findTestAccount(cleanEmail);
+
+    if (matchedAccount != null) {
+      if (senha != matchedAccount.senha) {
+        return false;
+      }
+      _isGuest = false;
+      _isTestPreviewMode = false;
+      _userEmail = matchedAccount.email;
+      _userName = matchedAccount.nome;
+      _activeProfile = perfil ?? matchedAccount.perfil;
+      notifyListeners();
+      return true;
+    }
+
+    if (cleanEmail.isEmpty ||
+        !cleanEmail.contains('@') ||
+        senha.length < 4) {
+      return false;
+    }
+
+    autenticarComEmail(cleanEmail, perfil: perfil);
+    return true;
+  }
+
+  TestAccount? _findTestAccount(String email) {
+    final normalized = email.trim().toLowerCase();
+    for (final account in contasTeste) {
+      if (account.email.toLowerCase() == normalized) {
+        return account;
+      }
+    }
+    return null;
   }
 
   /// Atualiza o filtro textual de busca dos serviços com o valor de [query].
